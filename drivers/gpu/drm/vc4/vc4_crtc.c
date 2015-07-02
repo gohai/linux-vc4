@@ -92,7 +92,7 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
 	u32 vactive = (mode->vdisplay >>
 		       ((mode->flags & DRM_MODE_FLAG_INTERLACE) ? 1 : 0));
 	u32 format = PV_CONTROL_FORMAT_24;
-	bool debug_dump_regs = false;
+	bool debug_dump_regs = true;
 
 	if (debug_dump_regs) {
 		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
@@ -223,7 +223,7 @@ static void vc4_crtc_atomic_flush(struct drm_crtc *crtc)
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
 	struct drm_plane *plane;
-	bool debug_dump_regs = false;
+	bool debug_dump_regs = true;
 	u32 __iomem *dlist_next = vc4_crtc->dlist;
 
 	if (debug_dump_regs) {

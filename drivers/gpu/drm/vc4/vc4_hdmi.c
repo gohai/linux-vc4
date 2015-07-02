@@ -292,7 +292,7 @@ static void vc4_hdmi_encoder_mode_set(struct drm_encoder *encoder,
 	struct vc4_hdmi_encoder *vc4_encoder = to_vc4_hdmi_encoder(encoder);
 	struct drm_device *dev = encoder->dev;
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
-	bool debug_dump_regs = false;
+	bool debug_dump_regs = true;
 	bool hsync_pos = !(mode->flags & DRM_MODE_FLAG_NHSYNC);
 	bool vsync_pos = !(mode->flags & DRM_MODE_FLAG_NVSYNC);
 	u32 vactive = (mode->vdisplay >>
