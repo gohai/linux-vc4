@@ -36,6 +36,7 @@
 #include <linux/pinctrl/consumer.h>
 #include <linux/pinctrl/machine.h>
 #include <linux/pinctrl/pinconf.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinmux.h>
 #include <linux/platform_device.h>
@@ -932,6 +933,18 @@ static int bcm2835_pinconf_set(struct pinctrl_dev *pctldev,
 	for (i = 0; i < num_configs; i++) {
 		param = BCM2835_PINCONF_UNPACK_PARAM(configs[i]);
 		arg = BCM2835_PINCONF_UNPACK_ARG(configs[i]);
+
+		/* Convert generic pinconf parameters to BCM2835 specifc ones */
+		if (param == PIN_CONFIG_BIAS_DISABLE) {
+			param = BCM2835_PINCONF_PARAM_PULL;
+			arg = BCM2835_PINCONFIG_PULL_NONE;
+		} else if (param == PIN_CONFIG_BIAS_PULL_UP) {
+			param = BCM2835_PINCONF_PARAM_PULL;
+			arg = BCM2835_PINCONFIG_PULL_UP;
+		} else if (param == PIN_CONFIG_BIAS_PULL_DOWN) {
+			param = BCM2835_PINCONF_PARAM_PULL;
+			arg = BCM2835_PINCONFIG_PULL_DOWN;
+		}
 
 		if (param != BCM2835_PINCONF_PARAM_PULL)
 			return -EINVAL;

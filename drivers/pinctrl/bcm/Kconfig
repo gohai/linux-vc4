@@ -19,6 +19,7 @@ config PINCTRL_BCM2835
 	bool
 	select PINMUX
 	select PINCONF
+	select GENERIC_PINCONF
 
 config PINCTRL_CYGNUS_GPIO
 	bool "Broadcom Cygnus GPIO (with PINCONF) driver"
