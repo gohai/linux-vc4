@@ -21,6 +21,7 @@
 #include <linux/pinctrl/machine.h>
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/pinconf.h>
+#include <linux/pinctrl/pinconf-generic.h>
 #include "core.h"
 #include "pinconf.h"
 
@@ -607,6 +608,132 @@ static const struct file_operations pinconf_dbg_pinconfig_fops = {
 	.owner = THIS_MODULE,
 };
 
+#ifdef CONFIG_GENERIC_PINCONF
+
+static int pinconf_dbg_biases_print(struct seq_file *s, void *d)
+{
+	struct pinctrl_dev *pctldev = s->private;
+	unsigned i, pin, ret;
+	unsigned long config;
+
+	seq_puts(s, "Bias settings per pin\n");
+	seq_puts(s, "Format: pin: active_param arg\n");
+
+	mutex_lock(&pctldev->mutex);
+
+	for (i = 0; i < pctldev->desc->npins; i++) {
+		pin = pctldev->desc->pins[i].number;
+		seq_printf(s, "pin %d: ", pin);
+
+		config = pinconf_to_config_packed(PIN_CONFIG_BIAS_DISABLE, 0);
+		/* assumes -EINVAL or similar if param is not active */
+		ret = pin_config_get_for_pin(pctldev, pin, &config);
+		if (!ret) {
+			seq_printf(s, "disable\n");
+			continue;
+		}
+
+		config = pinconf_to_config_packed(PIN_CONFIG_BIAS_PULL_UP, 0);
+		ret = pin_config_get_for_pin(pctldev, pin, &config);
+		if (!ret) {
+			seq_printf(s, "pull_up %d\n", pinconf_to_config_argument(config));
+			continue;
+		}
+
+		config = pinconf_to_config_packed(PIN_CONFIG_BIAS_PULL_DOWN, 0);
+		ret = pin_config_get_for_pin(pctldev, pin, &config);
+		if (!ret) {
+			seq_printf(s, "pull_down %d\n", pinconf_to_config_argument(config));
+			continue;
+		}
+
+		seq_printf(s, "unknown\n");
+	}
+
+	mutex_unlock(&pctldev->mutex);
+
+	return 0;
+}
+
+static ssize_t pinconf_dbg_biases_write(struct file *file,
+	const char __user *user_buf, size_t count, loff_t *ppos)
+{
+	struct pinctrl_dev *pctldev = (struct pinctrl_dev *)file->private_data;
+	const struct pinconf_ops *ops = pctldev->desc->confops;
+	char buf[128];
+	int buf_size;
+	char *b = &buf[0];
+	char *token;
+	unsigned long config;
+	int pin;
+	enum pin_config_param parm;
+	u16 arg;
+	int ret;
+
+	/* Get userspace string and assure termination */
+	buf_size = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, buf_size))
+		return -EFAULT;
+	buf[buf_size] = 0;
+
+	/* Get arg: pin number */
+	token = strsep(&b, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtoint(token, 10, &pin) < 0)
+		return -EINVAL;
+
+	/* Get arg: disable | pull_up | pull_down */
+	token = strsep(&b, " ");
+	if (!token)
+		return -EINVAL;
+	if (!strcmp(token, "disable")) {
+		parm = PIN_CONFIG_BIAS_DISABLE;
+	} else if (!strcmp(token, "pull_up")) {
+		parm = PIN_CONFIG_BIAS_PULL_UP;
+	} else if (!strcmp(token, "pull_down")) {
+		parm = PIN_CONFIG_BIAS_PULL_DOWN;
+	} else {
+		return -EINVAL;
+	}
+
+	/* Get arg: value, e.g. the number of Ohms */
+	token = strsep(&b, " ");
+	if (!token)
+		return -EINVAL;
+	if (kstrtou16(token, 10, &arg) < 0)
+		return -EINVAL;
+
+	config = pinconf_to_config_packed(parm, arg);
+
+	if (!ops->pin_config_set) {
+		dev_err(pctldev->dev, "missing pin_config_set op\n");
+		return -EINVAL;
+	}
+	ret = ops->pin_config_set(pctldev, pin, &config, 1);
+	if (ret < 0) {
+		return ret;
+	}
+
+	return count;
+}
+
+static int pinconf_dbg_biases_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, pinconf_dbg_biases_print, inode->i_private);
+}
+
+static const struct file_operations pinconf_dbg_biases_fops = {
+	.open = pinconf_dbg_biases_open,
+	.write = pinconf_dbg_biases_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.owner = THIS_MODULE,
+};
+
+#endif	// CONFIG_GENERIC_PINCONF
+
 void pinconf_init_device_debugfs(struct dentry *devroot,
 			 struct pinctrl_dev *pctldev)
 {
@@ -616,6 +743,10 @@ void pinconf_init_device_debugfs(struct dentry *devroot,
 			    devroot, pctldev, &pinconf_groups_ops);
 	debugfs_create_file("pinconf-config",  (S_IRUGO | S_IWUSR | S_IWGRP),
 			    devroot, pctldev, &pinconf_dbg_pinconfig_fops);
+#ifdef CONFIG_GENERIC_PINCONF
+	debugfs_create_file("pinconf-biases",  (S_IRUGO | S_IWUSR | S_IWGRP),
+			    devroot, pctldev, &pinconf_dbg_biases_fops);
+#endif
 }
 
 #endif
